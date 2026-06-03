@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Extrair Paginas do PDF</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<style>
+:root{
+    --bg:#0f172a;
+    --card:#111827;
+    --card2:#1f2937;
+    --border:#374151;
+    --text:#f8fafc;
+    --muted:#94a3b8;
+    --primary:#3b82f6;
+    --primary-hover:#2563eb;
+    --success:#10b981;
+    --danger:#ef4444;
+}
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+    font-family:'Inter',sans-serif;
+    background:linear-gradient(135deg,#020617,#0f172a);
+    color:var(--text);
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    padding:30px;
+}
+
+.container{
+    width:100%;
+    max-width:900px;
+}
+
+.card{
+    background:rgba(17,24,39,.95);
+    border:1px solid rgba(255,255,255,.08);
+    backdrop-filter:blur(12px);
+    border-radius:24px;
+    padding:30px;
+    box-shadow:
+    0 25px 50px rgba(0,0,0,.4);
+}
+
+.header{
+    text-align:center;
+    margin-bottom:25px;
+}
+
+.header h1{
+    font-size:32px;
+    font-weight:800;
+}
+
+.header p{
+    color:var(--muted);
+    margin-top:8px;
+}
+
+.dropzone{
+    width:100%;
+    min-height:180px;
+
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+
+    gap:8px;
+
+    border:2px dashed #4b5563;
+    border-radius:18px;
+
+    text-align:center;
+    cursor:pointer;
+    transition:all .3s ease;
+
+    background:rgba(255,255,255,.02);
+
+    margin-bottom:20px;
+}
+
+.dropzone h3{
+    margin:0;
+    font-size:30px;
+}
+
+.dropzone p{
+    margin:0;
+    color:#94a3b8;
+}
+
+.dropzone:hover{
+    border-color:#3b82f6;
+    background:rgba(59,130,246,.08);
+}
+
+.dropzone.active{
+    border-color:#3b82f6;
+    background:rgba(59,130,246,.12);
+}
+
+.dropzone input{
+    display:none;
+}
+
+.file-info{
+    display:none;
+    margin-top:20px;
+    padding:16px;
+    border-radius:14px;
+    background:#111827;
+    border:1px solid var(--border);
+}
+
+.grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:15px;
+    margin-top:20px;
+}
+
+.field{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+}
+
+.field label{
+    font-size:14px;
+    color:var(--muted);
+}
+
+.field input{
+    height:48px;
+    border-radius:12px;
+    border:1px solid var(--border);
+    background:#0f172a;
+    color:white;
+    padding:0 14px;
+    font-size:15px;
+}
+
+button{
+    width:100%;
+    margin-top:20px;
+    height:54px;
+    border:none;
+    border-radius:14px;
+    background:var(--primary);
+    color:white;
+    font-size:16px;
+    font-weight:700;
+    cursor:pointer;
+    transition:.2s;
+}
+
+button:hover{
+    background:var(--primary-hover);
+}
+
+button:disabled{
+    opacity:.5;
+    cursor:not-allowed;
+}
+
+.progress{
+    display:none;
+    margin-top:20px;
+}
+
+.progress-bar{
+    height:10px;
+    background:#1f2937;
+    border-radius:999px;
+    overflow:hidden;
+}
+
+.progress-fill{
+    width:0%;
+    height:100%;
+    background:linear-gradient(90deg,#3b82f6,#60a5fa);
+    transition:.3s;
+}
+
+.message{
+    margin-top:15px;
+    padding:14px;
+    border-radius:12px;
+    display:none;
+}
+
+.success{
+    background:rgba(16,185,129,.15);
+    border:1px solid rgba(16,185,129,.4);
+}
+
+.error{
+    background:rgba(239,68,68,.15);
+    border:1px solid rgba(239,68,68,.4);
+}
+
+.results{
+    display:none;
+    margin-top:20px;
+}
+
+.results ul{
+    list-style:none;
+    margin-top:10px;
+}
+
+.results li{
+    padding:10px;
+    border-bottom:1px solid rgba(255,255,255,.05);
+    color:#cbd5e1;
+}
+
+.download-btn{
+    background:var(--success);
+}
+
+.download-btn:hover{
+    background:#059669;
+}
+
+@media(max-width:768px){
+    .grid{
+        grid-template-columns:1fr;
+    }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card">
+
+        <div class="header">
+            <h1>Extrair PDF</h1>
+            <p>Extraia páginas em blocos sobrepostos automaticamente</p>
+        </div>
+
+        <label class="dropzone" id="dropzone">
+            <input type="file" id="pdfFile" accept=".pdf">
+            <h3>📄 Arraste um PDF aqui</h3>
+            <p>ou clique para selecionar</p>
+        </label>
+
+        <div class="file-info" id="fileInfo">
+            <strong id="fileName"></strong>
+            <div style="margin-top:8px;">
+                Total de páginas:
+                <strong id="pageCount"></strong>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="field">
+                <label>Página Inicial</label>
+                <input type="number" id="startPage" min="1">
+            </div>
+
+            <div class="field">
+                <label>Página Final</label>
+                <input type="number" id="endPage" min="1">
+            </div>
+
+            <div class="field">
+                <label>Intervalo</label>
+                <input type="number" id="interval" min="1">
+            </div>
+        </div>
+
+        <button id="generateBtn">
+            Gerar Arquivos
+        </button>
+
+        <div class="progress" id="progress">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+        </div>
+
+        <div class="message" id="message"></div>
+
+        <div class="results" id="results">
+            <h3>Arquivos Gerados</h3>
+            <ul id="resultsList"></ul>
+
+            <button
+                class="download-btn"
+                id="downloadZipBtn">
+                Baixar ZIP
+            </button>
+        </div>
+
+    </div>
+</div>
+
+<script>
+
+const { PDFDocument } = PDFLib;
+
+let pdfBytes = null;
+let totalPages = 0;
+let generatedZip = null;
+
+const pdfInput = document.getElementById('pdfFile');
+const dropzone = document.getElementById('dropzone');
+
+dropzone.addEventListener('dragover', e=>{
+    e.preventDefault();
+    dropzone.classList.add('active');
+});
+
+dropzone.addEventListener('dragleave', ()=>{
+    dropzone.classList.remove('active');
+});
+
+dropzone.addEventListener('drop', e=>{
+    e.preventDefault();
+    dropzone.classList.remove('active');
+
+    const file = e.dataTransfer.files[0];
+    if(file){
+        handleFile(file);
+    }
+});
+
+pdfInput.addEventListener('change', e=>{
+    if(e.target.files[0]){
+        handleFile(e.target.files[0]);
+    }
+});
+
+async function handleFile(file){
+
+    if(file.type !== 'application/pdf'){
+        showError('Selecione um PDF válido.');
+        return;
+    }
+
+    pdfBytes = await file.arrayBuffer();
+
+    const pdfDoc = await PDFDocument.load(pdfBytes);
+
+    totalPages = pdfDoc.getPageCount();
+
+    document.getElementById('fileInfo').style.display='block';
+    document.getElementById('fileName').textContent=file.name;
+    document.getElementById('pageCount').textContent=totalPages;
+
+    hideMessage();
+}
+
+function showError(text){
+    const el=document.getElementById('message');
+    el.className='message error';
+    el.style.display='block';
+    el.textContent=text;
+}
+
+function showSuccess(text){
+    const el=document.getElementById('message');
+    el.className='message success';
+    el.style.display='block';
+    el.textContent=text;
+}
+
+function hideMessage(){
+    document.getElementById('message').style.display='none';
+}
+
+document
+.getElementById('generateBtn')
+.addEventListener('click',generateFiles);
+
+async function generateFiles(){
+
+    try{
+
+        hideMessage();
+
+        if(!pdfBytes){
+            throw new Error('Selecione um PDF.');
+        }
+
+        const startPage =
+        parseInt(document.getElementById('startPage').value);
+
+        const endPage =
+        parseInt(document.getElementById('endPage').value);
+
+        const interval =
+        parseInt(document.getElementById('interval').value);
+
+        if(isNaN(startPage))
+            throw new Error('Informe a página inicial.');
+
+        if(isNaN(endPage))
+            throw new Error('Informe a página final.');
+
+        if(isNaN(interval))
+            throw new Error('Informe o intervalo.');
+
+        if(startPage < 1)
+            throw new Error('Página inicial inválida.');
+
+        if(endPage < 1)
+            throw new Error('Página final inválida.');
+
+        if(interval < 1)
+            throw new Error('Intervalo inválido.');
+
+        if(startPage > totalPages)
+            throw new Error(
+                `A página inicial excede o PDF (${totalPages} páginas).`
+            );
+
+        if(endPage > totalPages)
+            throw new Error(
+                `A página final excede o PDF (${totalPages} páginas).`
+            );
+
+        if(endPage < startPage)
+            throw new Error(
+                'Página final deve ser maior que a inicial.'
+            );
+
+        const sourcePdf =
+        await PDFDocument.load(pdfBytes);
+
+        const zip = new JSZip();
+
+        const resultList =
+        document.getElementById('resultsList');
+
+        resultList.innerHTML='';
+
+        document.getElementById('results')
+        .style.display='block';
+
+        document.getElementById('progress')
+        .style.display='block';
+
+        const step = Math.max(interval - 1, 1);
+
+        let fileCount = 0;
+
+        const blocks = [];
+
+        for(
+            let start = startPage;
+            start <= endPage;
+            start += step
+        ){
+
+            const end =
+            Math.min(
+                start + interval - 1,
+                endPage
+            );
+
+            blocks.push({start,end});
+
+            if(end === endPage)
+                break;
+        }
+
+        for(let i=0;i<blocks.length;i++){
+
+            const block = blocks[i];
+
+            const newPdf =
+            await PDFDocument.create();
+
+            const pageIndexes = [];
+
+            for(
+                let p=block.start;
+                p<=block.end;
+                p++
+            ){
+                pageIndexes.push(p-1);
+            }
+
+            const copiedPages =
+            await newPdf.copyPages(
+                sourcePdf,
+                pageIndexes
+            );
+
+            copiedPages.forEach(page=>{
+                newPdf.addPage(page);
+            });
+
+            const pdfData =
+            await newPdf.save();
+
+            const filename =
+            `arquivo_${String(i+1).padStart(2,'0')}.pdf`;
+
+            zip.file(filename,pdfData);
+
+            const li =
+            document.createElement('li');
+
+            li.textContent =
+            `${filename} → páginas ${block.start}-${block.end}`;
+
+            resultList.appendChild(li);
+
+            fileCount++;
+
+            const percent =
+            ((i+1)/blocks.length)*100;
+
+            document
+            .getElementById('progressFill')
+            .style.width=
+            percent+'%';
+        }
+
+        generatedZip =
+        await zip.generateAsync({
+            type:'blob'
+        });
+
+        showSuccess(
+            `${fileCount} arquivos gerados com sucesso.`
+        );
+
+    }catch(err){
+        showError(err.message);
+    }
+}
+
+document
+.getElementById('downloadZipBtn')
+.addEventListener('click',()=>{
+
+    if(!generatedZip)
+        return;
+
+    const link =
+    document.createElement('a');
+
+    link.href =
+    URL.createObjectURL(generatedZip);
+
+    link.download =
+    'pdf_extracoes.zip';
+
+    link.click();
+});
+
+</script>
+
+</body>
+</html>
